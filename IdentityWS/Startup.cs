@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using IdentityWS.Utils;
 
 namespace IdentityWS
 {
@@ -22,6 +23,8 @@ namespace IdentityWS
             services.AddDbContext<IdentityWsDbContext>(options => options.UseMySql(configuration.GetConnectionString("DefaultConnection")));
 
             services.AddMvc();
+
+            services.AddSingleton<IUtcNow, DateTimeTestable>();
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
@@ -33,7 +36,7 @@ namespace IdentityWS
                 // Apply DB migrations, if any.
                 serviceScope.ServiceProvider.GetRequiredService<IdentityWsDbContext>().Database.Migrate();
 
-            app.UseMvc(routes => routes.MapRoute("default", "identityws/{controller}/{email_address}/{action=Index}/{app?}/{app_action?}"));
+            app.UseMvc(routes => routes.MapRoute("default", "{controller}/{email_address}/{action=Index}/{client?}"));
         }
     }
 }

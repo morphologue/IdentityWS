@@ -28,6 +28,10 @@ namespace IdentityWS.Models
                 .WithOne(h => h.Alias)
                 .HasForeignKey(h => h.AliasID);
 
+            builder.Entity<Alias>()
+                .HasIndex(a => a.EmailAddress)
+                .IsUnique();
+
             builder.Entity<Being>()
                 .HasMany(b => b.Aliases)
                 .WithOne(a => a.Being)
@@ -42,6 +46,14 @@ namespace IdentityWS.Models
                 .HasMany(c => c.Data)
                 .WithOne(d => d.BeingClient)
                 .HasForeignKey(d => d.BeingClientID);
+
+            builder.Entity<BeingClient>()
+                .HasIndex(bc => new { bc.BeingID, bc.ClientName })
+                .IsUnique();
+
+            builder.Entity<BeingClientDatum>()
+                .HasIndex(d => new { d.BeingClientID, d.Key })
+                .IsUnique();
         }
     }
 }

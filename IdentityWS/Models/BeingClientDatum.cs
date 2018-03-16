@@ -8,6 +8,7 @@ namespace IdentityWS.Models
         public int BeingClientID { get; set; }
         [Required]
         public string Key { get; set; }
+        [Required]
         public string Value { get; set; }
         public BeingClient BeingClient { get; set; }
     }
