@@ -11,6 +11,6 @@
     <PackageReference Include="MSTest.TestFramework" Version="1.1.18" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\IdentityWS\IdentityWS.csproj" />
+    <ProjectReference Include="..\IdentityWs\IdentityWs.csproj" />
   </ItemGroup>
 </Project>
