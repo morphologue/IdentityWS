@@ -2,29 +2,33 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using IdentityWS.Models;
+using IdentityWs.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
-using IdentityWS.Utils;
+using IdentityWs.Utils;
+using System.Threading;
+using IdentityWs.Jobs;
 
-namespace IdentityWS
+namespace IdentityWs
 {
     public class Startup
     {
-        public Startup(IConfiguration configuration) => this.configuration = configuration;
+        IConfiguration configuration;
 
-        IConfiguration configuration { get; }
+        public Startup(IConfiguration configuration) => this.configuration = configuration;
 
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddSingleton<IConfiguration>(configuration);
             services.AddDbContext<IdentityWsDbContext>(options => options.UseMySql(configuration.GetConnectionString("DefaultConnection")));
-
             services.AddMvc();
-
             services.AddSingleton<IUtcNow, DateTimeTestable>();
+            services.AddScoped<IEmailSender, EmailSender>();
+            services.AddSingleton<EmailQueueProcessor>();
+            services.AddSingleton<IBackgroundJobRunner<EmailQueueProcessor>, BackgroundJobRunner<EmailQueueProcessor>>();
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
@@ -32,11 +36,14 @@ namespace IdentityWS
             if (env.IsDevelopment())
                 app.UseDeveloperExceptionPage();
 
-            using (IServiceScope serviceScope = app.ApplicationServices.GetService<IServiceScopeFactory>().CreateScope())
+            using (IServiceScope serviceScope = app.ApplicationServices.CreateScope())
                 // Apply DB migrations, if any.
                 serviceScope.ServiceProvider.GetRequiredService<IdentityWsDbContext>().Database.Migrate();
 
             app.UseMvc(routes => routes.MapRoute("default", "{controller}/{email_address}/{action=Index}/{client?}"));
+
+            TimeSpan interval = TimeSpan.FromSeconds(configuration.GetValue<double>("SecsBetweenEmailQueueRuns"));
+            app.ApplicationServices.GetRequiredService<IBackgroundJobRunner<EmailQueueProcessor>>().Start(interval);
         }
     }
 }

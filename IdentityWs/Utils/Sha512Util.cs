@@ -2,7 +2,7 @@ using System;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace IdentityWS.Utils
+namespace IdentityWs.Utils
 {
     // Methods to compute and check crypt()-style SHA512 hashes. The hashes will start with "$6$"
     // and are the kind of thing one might find in /etc/shadow on a Unix system. The default number

@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace IdentityWS.Models
+namespace IdentityWs.Models
 {
     public class BeingClientDatum
     {

@@ -1,14 +1,9 @@
 using System;
 
-namespace IdentityWS.Utils
+namespace IdentityWs.Utils
 {
     public interface IUtcNow
     {
         DateTime UtcNow { get; }
-    }
-
-    public class DateTimeTestable : IUtcNow
-    {
-        public DateTime UtcNow => DateTime.UtcNow;
     }
 }

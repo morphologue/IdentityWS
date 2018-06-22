@@ -5,25 +5,30 @@ using System.Diagnostics;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
-using IdentityWS.Models;
-using IdentityWS.Utils;
+using IdentityWs.Jobs;
+using IdentityWs.Models;
+using IdentityWs.Utils;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace IdentityWS.Controllers
+namespace IdentityWs.Controllers
 {
     public class AliasesController : Controller
     {
         IdentityWsDbContext ef;
         ILogger<AliasesController> log;
         IUtcNow now;
+        IBackgroundJobRunner<EmailQueueProcessor> runner;
 
-        public AliasesController(IdentityWsDbContext ef, ILogger<AliasesController> log, IUtcNow now) {
+        public AliasesController(IdentityWsDbContext ef, ILogger<AliasesController> log, IUtcNow now,
+            IBackgroundJobRunner<EmailQueueProcessor> runner)
+        {
             this.ef = ef;
             this.log = log;
             this.now = now;
+            this.runner = runner;
         }
 
         // Get the alias's confirmation token, or null if it has already been confirmed.
@@ -232,6 +237,7 @@ namespace IdentityWS.Controllers
         // Receive back a confirmation token obtained from Index() above.
         public class ConfirmPostRequestBody
         {
+            [Required]
             public string confirmToken { get; set; }
         }
         [HttpPost]
@@ -250,6 +256,91 @@ namespace IdentityWS.Controllers
             
             if (!alias.DateConfirmed.HasValue)
                 alias.DateConfirmed = now.UtcNow;
+
+            return NoContent();
+        }
+
+        public class LoginRequestBody
+        {
+            [Required]
+            public string password { get; set; }
+        }
+        [HttpPost]
+        public async Task<IActionResult> Login([EmailAddress, MaxLength(100)] string email_address, [FromBody] LoginRequestBody body)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            // Get the entities.
+            Alias alias = await ef.Aliases
+                .Include(a => a.Being)
+                .FirstOrDefaultAsync(a => a.EmailAddress == email_address);
+            Being being = alias?.Being;
+            if (being == null)
+                return NotFound();
+
+            // Check the password.
+            bool password_ok = Sha512Util.TestPassword(body.password, being.SaltedHashedPassword);
+
+            // Log the attempt.
+            ef.LoginAttempts.Add(new LoginAttempt
+            {
+                AliasID = alias.AliasID,
+                Success = password_ok
+            });
+            await ef.SaveChangesAsync();
+
+            return password_ok ? (IActionResult)NoContent() : Unauthorized();
+        }
+
+        public class EmailRequestBody
+        {
+            [EmailAddress]
+            [Required]
+            [MaxLength(100)]
+            public string from { get; set; }
+
+            [EmailAddress]
+            [MaxLength(100)]
+            public string replyTo { get; set; }
+
+            [Required]
+            [MaxLength(100)]
+            public string subject { get; set; }
+
+            public string bodyText { get; set; }
+
+            public string bodyHTML { get; set; }
+
+            // Default = false
+            public bool? sendIfUnconfirmed { get; set; }
+        }
+        [HttpPost]
+        public async Task<IActionResult> Email([EmailAddress, MaxLength(100)] string email_address, [FromBody] EmailRequestBody body)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            // Get the alias.
+            Alias alias = await ef.Aliases.FirstOrDefaultAsync(a => a.EmailAddress == email_address);
+            if (alias == null)
+                return NotFound();
+
+            // Enqueue the email.
+            ef.Emails.Add(new Email
+            {
+                AliasID = alias.AliasID,
+                From = body.from,
+                ReplyTo = body.replyTo,
+                Subject = body.subject,
+                BodyText = body.bodyText,
+                BodyHTML = body.bodyHTML,
+                SendIfUnconfirmed = body.sendIfUnconfirmed ?? false
+            });
+            await ef.SaveChangesAsync();
+
+            // Ensure the email is sent sooner rather than later.
+            runner.Nudge();
 
             return NoContent();
         }

@@ -2,7 +2,7 @@
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 
-namespace IdentityWS.Models
+namespace IdentityWs.Models
 {
     public class IdentityWsDbContext : DbContext
     {

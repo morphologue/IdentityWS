@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace IdentityWS.Models
+namespace IdentityWs.Models
 {
     public class Alias
     {

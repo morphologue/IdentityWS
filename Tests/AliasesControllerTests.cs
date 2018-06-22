@@ -4,9 +4,10 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using FluentAssertions;
-using IdentityWS.Controllers;
-using IdentityWS.Models;
-using IdentityWS.Utils;
+using IdentityWs.Controllers;
+using IdentityWs.Jobs;
+using IdentityWs.Models;
+using IdentityWs.Utils;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,7 @@ namespace Tests
     public class AliasesControllerTests
     {
         static readonly ILogger<AliasesController> dummyLog = new Mock<ILogger<AliasesController>>().Object;
+        static readonly IBackgroundJobRunner<EmailQueueProcessor> dummyRunner = new Mock<IBackgroundJobRunner<EmailQueueProcessor>>().Object;
         static readonly IUtcNow now;
 
         static AliasesControllerTests() {
@@ -34,7 +36,7 @@ namespace Tests
             using (IdentityWsDbContext ef = CreateEf()) {
                 ef.Aliases.Add(new Alias { EmailAddress = "email@test.org" });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.Index("email@test.org");
 
@@ -53,7 +55,7 @@ namespace Tests
                     DateConfirmed = now.UtcNow
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.Index("email@test.org");
 
@@ -67,7 +69,7 @@ namespace Tests
         public async Task NoAlias_IndexGet_NotFound()
         {
             using (IdentityWsDbContext ef = CreateEf()) {
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.Index("email@test.org");
 
@@ -81,7 +83,7 @@ namespace Tests
             using (IdentityWsDbContext ef = CreateEf()) {
                 ef.Aliases.Add(new Alias { EmailAddress = "email@test.org" });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.IndexPost("email@test.org", new AliasesController.IndexPostRequestBody
                 {
@@ -99,7 +101,7 @@ namespace Tests
             using (IdentityWsDbContext ef = CreateEf()) {
                 ef.Aliases.Add(new Alias { EmailAddress = "email@test.org" });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.IndexPost("different@email.org", new AliasesController.IndexPostRequestBody
                 {
@@ -118,7 +120,7 @@ namespace Tests
             using (IdentityWsDbContext ef = CreateEf()) {
                 ef.Aliases.Add(new Alias { EmailAddress = "email@test.org" });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPostRequestBody body = new AliasesController.IndexPostRequestBody
                 {
@@ -137,7 +139,7 @@ namespace Tests
             using (IdentityWsDbContext ef = CreateEf()) {
                 ef.Aliases.Add(new Alias { EmailAddress = "email@test.org" });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPostRequestBody body = new AliasesController.IndexPostRequestBody();
                 IActionResult result = await patient.IndexPost("different@email.org", body);
@@ -156,7 +158,7 @@ namespace Tests
                     Being = new Being()
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPostRequestBody body = new AliasesController.IndexPostRequestBody
                 {
@@ -179,7 +181,7 @@ namespace Tests
                     EmailAddress = "email@test.org"
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPostRequestBody body = new AliasesController.IndexPostRequestBody
                 {
@@ -195,7 +197,7 @@ namespace Tests
         public async Task NoAlias_IndexPatch_NotFound()
         {
             using (IdentityWsDbContext ef = CreateEf()) {
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPatchRequestBody body = new AliasesController.IndexPatchRequestBody
                 {
@@ -218,7 +220,7 @@ namespace Tests
                 });
                 await ef.SaveChangesAsync();
 
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPatchRequestBody body = new AliasesController.IndexPatchRequestBody
                 {
@@ -243,7 +245,7 @@ namespace Tests
                     }
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPatchRequestBody body = new AliasesController.IndexPatchRequestBody
                 {
@@ -270,7 +272,7 @@ namespace Tests
                     }
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPatchRequestBody body = new AliasesController.IndexPatchRequestBody
                 {
@@ -297,7 +299,7 @@ namespace Tests
                     }
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPatchRequestBody body = new AliasesController.IndexPatchRequestBody
                 {
@@ -325,7 +327,7 @@ namespace Tests
                     Being = being
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPatchRequestBody body = new AliasesController.IndexPatchRequestBody
                 {
@@ -352,7 +354,7 @@ namespace Tests
                     }
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPatchRequestBody body = new AliasesController.IndexPatchRequestBody
                 {
@@ -379,7 +381,7 @@ namespace Tests
                     Being = being
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 AliasesController.IndexPatchRequestBody body = new AliasesController.IndexPatchRequestBody
                 {
@@ -397,7 +399,7 @@ namespace Tests
         public async Task NoAliasNoClient_Clients_NotFound()
         {
             using (IdentityWsDbContext ef = CreateEf()) {
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.Clients("nonexistent@alias.org", "nonexistent@client.org");
 
@@ -415,7 +417,7 @@ namespace Tests
                     Being = new Being()
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.Clients("email@test.org", "nonexistent@client.org");
 
@@ -439,7 +441,7 @@ namespace Tests
                     }
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.Clients("email@test.org", "testclient");
 
@@ -477,7 +479,7 @@ namespace Tests
                     }
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.Clients("email@test.org", "testclient");
 
@@ -491,7 +493,7 @@ namespace Tests
         public async Task NoBeing_ClientsPost_NotFound()
         {
             using (IdentityWsDbContext ef = CreateEf()) {
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.ClientsPost("nonexistent@being.org", "testclient", new Dictionary<string, string>());
 
@@ -516,7 +518,7 @@ namespace Tests
                     }
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.ClientsPost("email@test.org", "testclient", new Dictionary<string, string>());
 
@@ -539,7 +541,7 @@ namespace Tests
                     Being = new Being()
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.ClientsPost("email@test.org", "testclient", expected_data);
 
@@ -556,7 +558,7 @@ namespace Tests
         public async Task NoBeing_ResetPost_NotFound()
         {
             using (IdentityWsDbContext ef = CreateEf()) {
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.ResetPost("nonexistent@being.org");
 
@@ -580,7 +582,7 @@ namespace Tests
                     Being = being
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.ResetPost("email@test.org");
 
@@ -595,7 +597,7 @@ namespace Tests
         public async Task NoAlias_Confirm_NotFound()
         {
             using (IdentityWsDbContext ef = CreateEf()) {
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.ConfirmPost("email@test.org", new AliasesController.ConfirmPostRequestBody
                 {
@@ -616,7 +618,7 @@ namespace Tests
                     ConfirmationToken = "abc"
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.ConfirmPost("email@test.org", new AliasesController.ConfirmPostRequestBody
                 {
@@ -634,7 +636,7 @@ namespace Tests
                 Alias alias;
                 ef.Aliases.Add(alias = new Alias { EmailAddress = "email@test.org" });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.ConfirmPost("email@test.org", new AliasesController.ConfirmPostRequestBody
                 {
@@ -658,7 +660,7 @@ namespace Tests
                     DateConfirmed = yesterday
                 });
                 await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
                 IActionResult result = await patient.ConfirmPost("email@test.org", new AliasesController.ConfirmPostRequestBody {
                     confirmToken = alias.ConfirmationToken

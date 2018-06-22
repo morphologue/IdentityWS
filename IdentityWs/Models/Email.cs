@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace IdentityWS.Models
+namespace IdentityWs.Models
 {
     public class Email {
         public Email() => this.DateCreated = DateTime.UtcNow;
@@ -19,8 +19,10 @@ namespace IdentityWS.Models
         public string Subject { get; set; }
         public string BodyText { get; set; }
         public string BodyHTML { get; set; }
-        public string ProcessingError { get; set; }
-        public DateTime? DateProcessed { get; set; }
+        public bool SendIfUnconfirmed { get; set; }
+        public int ProcessingCount { get; set; }
+        public string LastProcessingError { get; set; }
+        public DateTime? DateLastProcessed { get; set; }
         public DateTime DateCreated { get; set; }
         public Alias To { get; set; }
     }
