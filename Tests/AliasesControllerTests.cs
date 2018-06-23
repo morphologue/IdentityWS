@@ -18,7 +18,7 @@ using Moq;
 namespace Tests
 {
     [TestClass]
-    public class AliasesControllerTests
+    public class AliasesControllerTests : EfTestBase
     {
         static readonly ILogger<AliasesController> dummyLog = new Mock<ILogger<AliasesController>>().Object;
         static readonly IBackgroundJobRunner<EmailQueueProcessor> dummyRunner = new Mock<IBackgroundJobRunner<EmailQueueProcessor>>().Object;
@@ -216,7 +216,10 @@ namespace Tests
                 ef.Aliases.Add(new Alias
                 {
                     EmailAddress = "email@test.org",
-                    Being = new Being()
+                    Being = new Being
+                    {
+                        SaltedHashedPassword = Sha512Util.SaltAndHashNewPassword("password1")
+                    }
                 });
                 await ef.SaveChangesAsync();
 
@@ -268,7 +271,8 @@ namespace Tests
                     Being = new Being
                     {
                         PasswordResetToken = "abracadabra",
-                        PasswordResetTokenValidUntil = now.UtcNow.AddHours(1)
+                        PasswordResetTokenValidUntil = now.UtcNow.AddHours(1),
+                        SaltedHashedPassword = Sha512Util.SaltAndHashNewPassword("password1")
                     }
                 });
                 await ef.SaveChangesAsync();
@@ -295,7 +299,8 @@ namespace Tests
                     Being = new Being
                     {
                         PasswordResetToken = "abracadabra",
-                        PasswordResetTokenValidUntil = now.UtcNow
+                        PasswordResetTokenValidUntil = now.UtcNow,
+                        SaltedHashedPassword = Sha512Util.SaltAndHashNewPassword("password1")
                     }
                 });
                 await ef.SaveChangesAsync();
@@ -319,7 +324,8 @@ namespace Tests
                 Being being = new Being
                 {
                     PasswordResetToken = "abracadabra",
-                    PasswordResetTokenValidUntil = now.UtcNow.AddMilliseconds(1)
+                    PasswordResetTokenValidUntil = now.UtcNow.AddMilliseconds(1),
+                    SaltedHashedPassword = Sha512Util.SaltAndHashNewPassword("password1")
                 };
                 ef.Aliases.Add(new Alias
                 {
@@ -342,7 +348,7 @@ namespace Tests
         }
 
         [TestMethod]
-        public async Task Alias_IndexPatchOldSameAsNew_BadRequest()
+        public async Task Alias_IndexPatchOldSameAsNew_Conflict()
         {
             using (IdentityWsDbContext ef = CreateEf()) {
                 ef.Aliases.Add(new Alias
@@ -363,7 +369,8 @@ namespace Tests
                 };
                 IActionResult result = await patient.IndexPatch("email@test.org", body);
 
-                result.Should().BeOfType<BadRequestResult>($"'{nameof(body.password)}' must differ from '{nameof(body.oldPassword)}'");
+                result.Should().BeOfType<StatusCodeResult>()
+                    .Which.StatusCode.Should().Be(409, $"'{nameof(body.password)}' must differ from '{nameof(body.oldPassword)}'");
             }
         }
 
@@ -396,161 +403,73 @@ namespace Tests
         }
 
         [TestMethod]
-        public async Task NoAliasNoClient_Clients_NotFound()
+        public async Task OneAlias_IndexDelete_Forbidden()
         {
-            using (IdentityWsDbContext ef = CreateEf()) {
-                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
-
-                IActionResult result = await patient.Clients("nonexistent@alias.org", "nonexistent@client.org");
-
-                result.Should().BeOfType<NotFoundResult>("the alias does not exist");
-            }
-        }
-
-        [TestMethod]
-        public async Task AliasNoClient_Clients_NotFound()
-        {
-            using (IdentityWsDbContext ef = CreateEf()) {
-                ef.Aliases.Add(new Alias
+            using (IdentityWsDbContext ef = CreateEf())
+            {
+                ef.Beings.Add(new Being
                 {
-                    EmailAddress = "email@test.org",
-                    Being = new Being()
-                });
-                await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
-
-                IActionResult result = await patient.Clients("email@test.org", "nonexistent@client.org");
-
-                result.Should().BeOfType<NotFoundResult>("the client does not exist");
-            }
-        }
-
-        [TestMethod]
-        public async Task AliasClientWithoutData_Clients_EmptyJsonArray()
-        {
-            using (IdentityWsDbContext ef = CreateEf()) {
-                ef.Aliases.Add(new Alias
-                {
-                    EmailAddress = "email@test.org",
-                    Being = new Being {
-                        Clients = new[] {
-                            new BeingClient {
-                                ClientName = "testclient"
-                            }
-                        }
-                    }
-                });
-                await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
-
-                IActionResult result = await patient.Clients("email@test.org", "testclient");
-
-                result.Should().BeOfType<JsonResult>()
-                    .Which.Value.Should().BeOfType<List<BeingClientDatum>>()
-                        .Which.Should().HaveCount(0, "there is no data for the client and being");
-            }
-        }
-
-        [TestMethod]
-        public async Task AliasClientWithData_Clients_DataAsJsonArray()
-        {
-            using (IdentityWsDbContext ef = CreateEf()) {
-                BeingClientDatum[] data = new[] {
-                    new BeingClientDatum {
-                        Key = "key1",
-                        Value = "value1"
-                    },
-                    new BeingClientDatum {
-                        Key = "key2",
-                        Value = "value2"
-                    }
-                };
-                ef.Aliases.Add(new Alias
-                {
-                    EmailAddress = "email@test.org",
-                    Being = new Being
+                    Aliases = new HashSet<Alias>
                     {
-                        Clients = new[] {
-                            new BeingClient {
-                                ClientName = "testclient",
-                                Data = data
-                            }
+                        new Alias
+                        {
+                            EmailAddress = "test1@test.org"
                         }
                     }
                 });
                 await ef.SaveChangesAsync();
                 AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
-                IActionResult result = await patient.Clients("email@test.org", "testclient");
+                IActionResult result = await patient.IndexDelete("test1@test.org");
 
-                result.Should().BeOfType<JsonResult>()
-                    .Which.Value.Should().BeOfType<List<BeingClientDatum>>()
-                        .Which.ShouldBeEquivalentTo(data, "such data are attested for the being and client");
+                result.Should().BeOfType<StatusCodeResult>()
+                    .Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden, "a being must not be without an alias");
+                (await ef.Aliases.CountAsync()).Should().Be(1, "the single alias was not deleted");
             }
         }
 
         [TestMethod]
-        public async Task NoBeing_ClientsPost_NotFound()
+        public async Task TwoAliases_IndexDelete_NoContentWithCascadingDeletion()
         {
             using (IdentityWsDbContext ef = CreateEf()) {
-                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
-
-                IActionResult result = await patient.ClientsPost("nonexistent@being.org", "testclient", new Dictionary<string, string>());
-
-                result.Should().BeOfType<NotFoundResult>("the being does not exist");
-            }
-        }
-
-        [TestMethod]
-        public async Task BeingAndClient_ClientsPost_Conflict()
-        {
-            using (IdentityWsDbContext ef = CreateEf()) {
-                ef.Aliases.Add(new Alias
+                ef.Beings.Add(new Being
                 {
-                    EmailAddress = "email@test.org",
-                    Being = new Being
+                    Aliases = new HashSet<Alias>
                     {
-                        Clients = new[] {
-                            new BeingClient {
-                                ClientName = "testclient"
+                        new Alias
+                        {
+                            EmailAddress = "test1@test.org",
+                            LoginAttempts = new HashSet<LoginAttempt>
+                            {
+                                new LoginAttempt
+                                {
+                                    ClientName = "Test"
+                                }
+                            },
+                            Emails = new HashSet<Email>
+                            {
+                                new Email
+                                {
+                                    From = "noreply@gavin-tech.com",
+                                    Subject = "Deletion"
+                                }
                             }
+                        },
+                        new Alias
+                        {
+                            EmailAddress = "test2@test.org"
                         }
                     }
                 });
                 await ef.SaveChangesAsync();
                 AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
 
-                IActionResult result = await patient.ClientsPost("email@test.org", "testclient", new Dictionary<string, string>());
+                IActionResult result = await patient.IndexDelete("test1@test.org");
 
-                result.Should().BeOfType<StatusCodeResult>().Which.StatusCode.Should().Be(StatusCodes.Status409Conflict,
-                    "the client already exists for the being");
-            }
-        }
-
-        [TestMethod]
-        public async Task Being_ClientsPost_NoContentWithNewBeingClientAndData()
-        {
-            using (IdentityWsDbContext ef = CreateEf()) {
-                Dictionary<string, string> expected_data = new Dictionary<string, string>() {
-                    ["key1"] = "value1",
-                    ["key2"] = "value2",
-                };
-                ef.Aliases.Add(new Alias
-                {
-                    EmailAddress = "email@test.org",
-                    Being = new Being()
-                });
-                await ef.SaveChangesAsync();
-                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
-
-                IActionResult result = await patient.ClientsPost("email@test.org", "testclient", expected_data);
-
-                result.Should().BeOfType<NoContentResult>("no such client existed previously for the being");
-                Dictionary<string, string> actual_data = new Dictionary<string, string>();
-                await ef.BeingClientData
-                    .Where(d => d.BeingClient.Being.Aliases.Any(a => a.EmailAddress == "email@test.org"))
-                    .ForEachAsync(d => actual_data.Add(d.Key, d.Value));
-                actual_data.ShouldBeEquivalentTo(expected_data, "such data were provided with the POST request");
+                result.Should().BeOfType<NoContentResult>("the alias may be deleted");
+                (await ef.Aliases.CountAsync()).Should().Be(1, "one of the aliases should be deleted");
+                (await ef.Emails.AnyAsync()).Should().Be(false, "the deletion should cascade to emails");
+                (await ef.LoginAttempts.AnyAsync()).Should().Be(false, "the deletion should cascade to login attempts");
             }
         }
 
@@ -671,10 +590,58 @@ namespace Tests
             }
         }
 
-        // Return a DB context for an in-memory database which is scoped to the calling method.
-        IdentityWsDbContext CreateEf([CallerMemberName] string caller = null) =>
-            new IdentityWsDbContext(new DbContextOptionsBuilder<IdentityWsDbContext>()
-                .UseInMemoryDatabase($"{GetType().Name}.{caller}")
-                .Options);
+        [TestMethod]
+        public async Task WrongAlias_Email_NotFound()
+        {
+            using (IdentityWsDbContext ef = CreateEf()) {
+                Alias alias;
+                ef.Aliases.Add(alias = new Alias
+                {
+                    EmailAddress = "email@test.org"
+                });
+                await ef.SaveChangesAsync();
+                AliasesController patient = new AliasesController(ef, dummyLog, now, dummyRunner);
+
+                IActionResult result = await patient.Email("wrong@test.org", new AliasesController.EmailRequestBody());
+
+                result.Should().BeOfType<NotFoundResult>("the email address doesn't match");
+            }
+        }
+
+        [TestMethod]
+        public async Task RightAlias_Email_NewDbRecordAndNudge()
+        {
+            using (IdentityWsDbContext ef = CreateEf()) {
+                Alias alias;
+                ef.Aliases.Add(alias = new Alias
+                {
+                    EmailAddress = "email@test.org"
+                });
+                await ef.SaveChangesAsync();
+                bool nudged = false;
+                Mock<IBackgroundJobRunner<EmailQueueProcessor>> mock_runner = new Mock<IBackgroundJobRunner<EmailQueueProcessor>>();
+                mock_runner.Setup(m => m.Nudge()).Callback(() => nudged = true);
+                AliasesController patient = new AliasesController(ef, dummyLog, now, mock_runner.Object);
+
+                IActionResult result = await patient.Email("email@test.org", new AliasesController.EmailRequestBody
+                {
+                    from = "noreply@gavin-tech.com",
+                    replyTo = "other@test.org",
+                    subject = "Testing",
+                    bodyText = "Hello, World!"
+                });
+                Email email = await ef.Emails.FirstAsync(e => e.AliasID == alias.AliasID);
+
+                result.Should().BeOfType<NoContentResult>("email processing is asynchronous");
+                email.Should().Match<Email>(e =>
+                        e.From == "noreply@gavin-tech.com"
+                        && e.ReplyTo == "other@test.org"
+                        && e.Subject == "Testing"
+                        && e.BodyText == "Hello, World!"
+                        && !e.SendIfUnconfirmed,
+                    "all values should be stored as-is in the database except SendIfUnconfirmed, which defaults to false");
+                nudged.Should().BeTrue("a new queue run should be triggered sooner rather than later");
+            }
+        }
     }
 }

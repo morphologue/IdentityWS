@@ -21,12 +21,14 @@ namespace IdentityWs.Models
             builder.Entity<Alias>()
                 .HasMany(a => a.Emails)
                 .WithOne(e => e.To)
-                .HasForeignKey(e => e.AliasID);
+                .HasForeignKey(e => e.AliasID)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<Alias>()
                 .HasMany(a => a.LoginAttempts)
                 .WithOne(h => h.Alias)
-                .HasForeignKey(h => h.AliasID);
+                .HasForeignKey(h => h.AliasID)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<Alias>()
                 .HasIndex(a => a.EmailAddress)
@@ -35,17 +37,20 @@ namespace IdentityWs.Models
             builder.Entity<Being>()
                 .HasMany(b => b.Aliases)
                 .WithOne(a => a.Being)
-                .HasForeignKey(a => a.BeingID);
+                .HasForeignKey(a => a.BeingID)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<Being>()
                 .HasMany(b => b.Clients)
                 .WithOne(c => c.Being)
-                .HasForeignKey(c => c.BeingID);
+                .HasForeignKey(c => c.BeingID)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<BeingClient>()
                 .HasMany(c => c.Data)
                 .WithOne(d => d.BeingClient)
-                .HasForeignKey(d => d.BeingClientID);
+                .HasForeignKey(d => d.BeingClientID)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.Entity<BeingClient>()
                 .HasIndex(bc => new { bc.BeingID, bc.ClientName })

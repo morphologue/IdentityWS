@@ -11,8 +11,6 @@ namespace IdentityWs.Models
         public int BeingID { get; set; }
         [Required]
         public string SaltedHashedPassword { get; set; }
-        public int FailedLoginAttempts { get; set; }
-        public DateTime? LockedOutUntil { get; set; }
         public string PasswordResetToken { get; set; }
         public DateTime? PasswordResetTokenValidUntil { get; set; }
         [Required]

@@ -121,8 +121,6 @@ namespace IdentityWs.Controllers
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
-            if (body.password == body.oldPassword)
-                return BadRequest();
 
             // Get the being.
             Being being = (await ef.Aliases
@@ -131,7 +129,7 @@ namespace IdentityWs.Controllers
                 ?.Being;
             if (being == null)
                 return NotFound();
-            
+
             if (body.resetToken != null) {
                 // Authenticate via reset token.
                 if (body.oldPassword != null)
@@ -140,6 +138,12 @@ namespace IdentityWs.Controllers
                 if (!being.PasswordResetTokenValidUntil.HasValue || being.PasswordResetTokenValidUntil <= now.UtcNow
                         || being.PasswordResetToken != body.resetToken)
                     return Unauthorized();
+                if (Sha512Util.TestPassword(body.password, being.SaltedHashedPassword))
+                    // Cannot change password to itself.
+                    return StatusCode(StatusCodes.Status409Conflict);
+                // The token is used up.
+                being.PasswordResetToken = null;
+                being.PasswordResetTokenValidUntil = null;
             } else {
                 // Authenticate via old password.
                 if (body.oldPassword == null)
@@ -147,6 +151,9 @@ namespace IdentityWs.Controllers
                     return BadRequest();
                 if (!Sha512Util.TestPassword(body.oldPassword, being.SaltedHashedPassword))
                     return Unauthorized();
+                if (body.oldPassword == body.password)
+                    // Cannot change password to itself.
+                    return StatusCode(StatusCodes.Status409Conflict);
             }
 
             // Change the password.
@@ -156,55 +163,27 @@ namespace IdentityWs.Controllers
             return NoContent();
         }
 
-        // Return the client data associated with the given being and client name.
-        public async Task<IActionResult> Clients([EmailAddress, MaxLength(100)] string email_address, string client)
+        // Remove this alias from the being, provided that at least one alias remains. If, on the
+        // other hand you want to the entire being, delete all of its clients.
+        [HttpDelete]
+        [ActionName("Index")]
+        public async Task<IActionResult> IndexDelete([EmailAddress, MaxLength(100)] string email_address)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            BeingClient bc = (await ef.Aliases
-                .Include(a => a.Being).ThenInclude(b => b.Clients)
-                .FirstOrDefaultAsync(a => a.EmailAddress == email_address))
-                ?.Being
-                .Clients
-                .FirstOrDefault(c => c.ClientName == client);
-            if (bc == null)
-                return NotFound();
-
-            return Json(await ef.BeingClientData
-                .Where(d => d.BeingClientID == bc.BeingClientID)
-                .ToListAsync());
-        }
-
-        // Register a client against the given being and client name.
-        [HttpPost]
-        [ActionName("Clients")]
-        public async Task<IActionResult> ClientsPost([EmailAddress, MaxLength(100)] string email_address, string client,
-            [FromBody] Dictionary<string, string> body)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            Being being = (await ef.Aliases
-                .Include(a => a.Being).ThenInclude(b => b.Clients)
-                .FirstOrDefaultAsync(a => a.EmailAddress == email_address))
-                ?.Being;
+            Alias alias = (await ef.Aliases
+                .Include(a => a.Being).ThenInclude(b => b.Aliases)
+                .FirstOrDefaultAsync(a => a.EmailAddress == email_address));
+            Being being = alias?.Being;
             if (being == null)
                 return NotFound();
-            if (being.Clients.Any(c => c.ClientName == client))
-                return StatusCode(StatusCodes.Status409Conflict);
 
-            being.Clients.Add(new BeingClient
-            {
-                ClientName = client,
-                Data = body.Select(kv => new BeingClientDatum
-                {
-                    Key = kv.Key,
-                    Value = kv.Value
-                }).ToList()
-            });
+            if (being.Aliases.Count < 2)
+                return StatusCode(StatusCodes.Status403Forbidden);
+
+            ef.Aliases.Remove(alias);
             await ef.SaveChangesAsync();
-            
             return NoContent();
         }
 
@@ -253,44 +232,13 @@ namespace IdentityWs.Controllers
             
             if (alias.ConfirmationToken != body.confirmToken)
                 return Unauthorized();
-            
-            if (!alias.DateConfirmed.HasValue)
+
+            if (!alias.DateConfirmed.HasValue) {
                 alias.DateConfirmed = now.UtcNow;
+                await ef.SaveChangesAsync();
+            }
 
             return NoContent();
-        }
-
-        public class LoginRequestBody
-        {
-            [Required]
-            public string password { get; set; }
-        }
-        [HttpPost]
-        public async Task<IActionResult> Login([EmailAddress, MaxLength(100)] string email_address, [FromBody] LoginRequestBody body)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            // Get the entities.
-            Alias alias = await ef.Aliases
-                .Include(a => a.Being)
-                .FirstOrDefaultAsync(a => a.EmailAddress == email_address);
-            Being being = alias?.Being;
-            if (being == null)
-                return NotFound();
-
-            // Check the password.
-            bool password_ok = Sha512Util.TestPassword(body.password, being.SaltedHashedPassword);
-
-            // Log the attempt.
-            ef.LoginAttempts.Add(new LoginAttempt
-            {
-                AliasID = alias.AliasID,
-                Success = password_ok
-            });
-            await ef.SaveChangesAsync();
-
-            return password_ok ? (IActionResult)NoContent() : Unauthorized();
         }
 
         public class EmailRequestBody

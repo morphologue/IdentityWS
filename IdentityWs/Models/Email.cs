@@ -1,9 +1,11 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using IdentityWs.Jobs;
 
 namespace IdentityWs.Models
 {
-    public class Email {
+    public class Email : ICleanable
+    {
         public Email() => this.DateCreated = DateTime.UtcNow;
         public int EmailID { get; set; }
         public int AliasID { get; set; }

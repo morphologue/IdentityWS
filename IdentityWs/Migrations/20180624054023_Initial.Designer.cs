@@ -11,9 +11,10 @@ using System;
 namespace IdentityWs.Migrations
 {
     [DbContext(typeof(IdentityWsDbContext))]
-    partial class IdentityWsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20180624054023_Initial")]
+    partial class Initial
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

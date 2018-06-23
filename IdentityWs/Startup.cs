@@ -29,6 +29,10 @@ namespace IdentityWs
             services.AddScoped<IEmailSender, EmailSender>();
             services.AddSingleton<EmailQueueProcessor>();
             services.AddSingleton<IBackgroundJobRunner<EmailQueueProcessor>, BackgroundJobRunner<EmailQueueProcessor>>();
+            services.AddSingleton<TableCleaner<LoginAttempt>>();
+            services.AddSingleton<IBackgroundJobRunner<TableCleaner<LoginAttempt>>, BackgroundJobRunner<TableCleaner<LoginAttempt>>>();
+            services.AddSingleton<TableCleaner<Email>>();
+            services.AddSingleton<IBackgroundJobRunner<TableCleaner<Email>>, BackgroundJobRunner<TableCleaner<Email>>>();
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
@@ -40,10 +44,23 @@ namespace IdentityWs
                 // Apply DB migrations, if any.
                 serviceScope.ServiceProvider.GetRequiredService<IdentityWsDbContext>().Database.Migrate();
 
-            app.UseMvc(routes => routes.MapRoute("default", "{controller}/{email_address}/{action=Index}/{client?}"));
+            app.UseMvc(routes => {
+                routes.MapRoute("aliases", "aliases/{email_address}/{action}", defaults: new
+                {
+                    controller = "Aliases",
+                    action = "Index"
+                });
+                routes.MapRoute("clients", "aliases/{email_address}/clients/{client}/{action}", defaults: new
+                {
+                    controller = "Clients",
+                    action = "Index"
+                });
+            });
 
-            TimeSpan interval = TimeSpan.FromSeconds(configuration.GetValue<double>("SecsBetweenEmailQueueRuns"));
-            app.ApplicationServices.GetRequiredService<IBackgroundJobRunner<EmailQueueProcessor>>().Start(interval);
+            // Start background jobs.
+            app.ApplicationServices.GetRequiredService<IBackgroundJobRunner<EmailQueueProcessor>>().Start();
+            app.ApplicationServices.GetRequiredService<IBackgroundJobRunner<TableCleaner<LoginAttempt>>>().Start();
+            app.ApplicationServices.GetRequiredService<IBackgroundJobRunner<TableCleaner<Email>>>().Start();
         }
     }
 }
