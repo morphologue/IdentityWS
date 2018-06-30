@@ -2,3 +2,4 @@ appsettings.json
 .vscode/
 bin/
 obj/
+pub/
