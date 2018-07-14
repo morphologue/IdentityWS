@@ -164,8 +164,8 @@ Because there was only one client associated with the being, deleting the client
 being.
 
 ## IdentityWs Client
-A client library targeting .NET Standard 2.0 is under development: see
-[IdentityWs Client](https://github.com/morphologue/IdentityWsClient).
+A client library targeting .NET Standard 1.1 (.NET Framework 4.5 or .NET Core 1.0 and greater) is
+available: see [IdentityWs Client](https://github.com/morphologue/IdentityWsClient).
 
 ## Security
 The web service doesn't require authentication: every request which makes sense will be actioned. As
