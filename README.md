@@ -4,8 +4,9 @@ A JSON web service to manage user accounts and email
 ## Concepts
 In this documentation a user account is referred to as a _being_.
 
-There is one password associated with each being, which is hashed using SHA-512. The password may
-be changed by supplying old and new passwords, or via a password reset token.
+There is one password associated with each being, which is hashed using SHA-512 (5000 rounds with
+key extension, à la /etc/shadow). The password may be changed by supplying old and new passwords, or
+via a password reset token.
 
 Each being is associated with zero or more _clients_. A client is an application which consumes the
 web service. When a client associates itself with a being it may store arbitrary data (e.g. a user
