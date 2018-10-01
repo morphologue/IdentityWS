@@ -18,7 +18,7 @@ namespace IdentityWs
         // https://wildermuth.com/2017/07/06/Program-cs-in-ASP-NET-Core-2-0
         public static IWebHost BuildWebHost(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
-                .UseUrls("http://0.0.0.0:5000")
+                .UseUrls("http://0.0.0.0:5003")
                 .UseStartup<Startup>()
                 .Build();
     }
