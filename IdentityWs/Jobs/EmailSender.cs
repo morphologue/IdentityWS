@@ -21,7 +21,7 @@ namespace IdentityWs.Jobs
             // Connect lazily: this instance might not actually be used.
             if (smtp == null) {
                 this.smtp = new SmtpClient();
-                smtp.Connect(config["SmtpHost"], options: SecureSocketOptions.None);
+                smtp.Connect(config["SmtpHost"], config["SmtpPort"] == null ? 0 : int.Parse(config["SmtpPort"]), SecureSocketOptions.None);
             }
 
             MimeMessage msg = new MimeMessage();
